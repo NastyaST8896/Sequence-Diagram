@@ -51,7 +51,7 @@
 sequenceDiagram
     actor C as Клиент
     participant S as Сервер
-    participant DB as "База данных" @{ "type": "database" } 
+    participant DB as "База данных <<database>>" 
     C->>+S: 1. GET /orders/{id} (см. табллицы 1 и 2)
     S->>S: 2. Валидация order_id
     
