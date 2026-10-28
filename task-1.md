@@ -42,155 +42,256 @@
 # Решение
 
 ## **GET запрос** 
+Метод `GET /orders/{id}` используется для получения информации о ранее созданном заказе по его идентификатору.
+
 Участники процесса: клиент, сервер, база данных.
 
-## Диаграммы последовательности для GET меотда
+### 1. Диаграммы последовательности для GET метода
+#### 1.1. Mermaid
 
 ```mermaid
-
 sequenceDiagram
-    actor C as Клиент
-    participant S as Сервер
-    participant DB as "База данных <<database>>" 
-    C->>+S: 1. GET /orders/{id} (см. табллицы 1 и 2)
-    S->>S: 2. Валидация order_id
-    
-    
-    break Ошибка валидации
-    rect rgba(250, 102, 102, 0.55)
-    S-->>C: 3. 400 Bad Request
+actor C as Клиент
+participant S as Сервер
+participant DB as "База данных <<database>>"
+
+C->>+S: 1. GET /orders/{id} (см. таблицы 2.1 и 2.2)
+
+S->>S: 2. Техническая валидация запроса
+Note over S: Проверка формата order_id
+    break Идентификатор некорректный
+        rect rgba(250, 102, 102, 0.55)
+            S-->>C: 2.1. 400 Bad Request (см. таблицу 3.2)
+        end
     end
-    end
-    S->>S: 4.Аутентификация
+    
+rect rgba(117, 252, 96, 0.54)
+    Note over S: 2.2. Идентификатор корректный
+end
+
+
+S->>S: 3.Аутентификация
+Note over S: Проверка заголовка Authorization
     break Токен невалидный \ отсутствует \ истек
-    rect rgba(250, 102, 102, 0.55)
-    S-->>C: 5. 401 Unauthorized
-    end
-    end
-    S->>+DB: 6. Отправка сформированного запроса
-    alt пользователь не владеет заказом или заказ отсутствует
-    rect rgba(250, 102, 102, 0.55)
-    DB-->>S: 7. пустой результат (NULL)
-    S-->>C: 8. 404 Not Found
-    end
-    else Ошибка подключения
-    rect rgba(250, 102, 102, 0.55)
-    DB-->>S:  9. Ошибка подключения
-    S-->>C: 10. 500 Internal Server Error
-    end
-    else заказ найден
-    rect rgba(117, 252, 96, 0.54)
-    DB-->>-S: 11. сырые данные (Result Set)
+        rect rgba(250, 102, 102, 0.55)
+            S-->>C: 3.1. 401 Unauthorized (см. таблицу 3.3)
+        end
     end
 
-     S->>S: 12. Мапинг
-    Note over S: Result Set -> JSON
-    rect rgba(117, 252, 96, 0.54)
-    S-->>-C: 13. 200 OK, JSON объект в теле ответа (см. таблицу 3)
-    end
+rect rgba(117, 252, 96, 0.54)
+    Note over S: 3.2. Токен валидный
+end
+
+S->>S: 4.Извлечение пользовательского контекста
+Note over S: Получение user_id из токена
+
+    
+S->>+DB: 5. SELECT заказа по order_id и user_id
+    alt пользователь не владеет заказом или заказ отсутствует
+        rect rgba(250, 102, 102, 0.55)
+            DB-->>S: 6.1. пустой результат (NULL)
+            S-->>C: 7.1. 404 Not Found (см. таблицу 3.4)
+        end
+    else Ошибка подключения
+        rect rgba(250, 102, 102, 0.55)
+            DB-->>S:  6.2. ConnectionError or Timeout
+            S-->>C: 7.2. 500 Internal Server Error (см. таблицу 3.5)
+        end
+    else заказ найден
+        rect rgba(117, 252, 96, 0.54)
+            DB-->>-S: 6.3. сырые данные (Result Set)
+        end
+
+        S->>S: 7.3. Мапинг данных
+        Note over S: Result Set -> JSON
+            rect rgba(117, 252, 96, 0.54)
+                S-->>-C: 8. 200 OK, JSON объект в теле ответа (см. таблицу 2.3)
+            end
     end
 ```
 
-### PlantUML диаграмма
+### 1.2. PlantUML
+
+![plantUML диаграмма](plantUML-diagrams/diagram-1.svg)
 
 ```plantuml
 @startuml
-autonumber "<b><color: purple>00.</color></b>"
 skinparam sequence {
-backgroundColor #9800e4
-ArrowColor #34054b
-LifeLineBorderColor #cb84ef
-LifeLineBackgroundColor #d49af1
-NoteBackgroundColor #360251
+backgroundColor #ffff
+ArrowColor #000000
+LifeLineBorderColor #000000
+LifeLineBackgroundColor #ffff
 
-ParticipantBorderColor #6a228e
-ParticipantBackgroundColor #daaff0
+ParticipantBorderColor #000000
+ParticipantBackgroundColor #f7f6d9
 ParticipantFontName Aapex
 ParticipantFontSize 20
-ParticipantFontColor #34054b
+ParticipantFontColor #000000
 
-ActorBorderColor #6a228e
-ActorBackgroundColor #daaff0
+ActorBorderColor #000000
+ActorBackgroundColor #f7f6d9
 ActorFontName Aapex
 ActorFontSize 20
-ActorFontColor #34054b
+ActorFontColor #000000
 ActorStyle awesome
 }
 skinparam database {
-BorderColor #6a228e
-BackgroundColor #daaff0
+BorderColor #000000
+BackgroundColor #f7f6d9
 FontName Aapex
 FontSize 20
-FontColor #34054b
+FontColor #000000
 }
+
 actor C as "Клиент"
 participant S as "Сервер"
 database DB as "База данных"
 
-C->S ++: GET /orders/{id} (см. табллицы 1 и 2)
-    S->S: Валидация order_id
-    
-    break#d49af1 #ff0d0069 Ошибка валидации 
-    S-->C: 400 Bad Request
+C->S ++: 1. GET /orders/{id} (см. таблицы 2.1 и 2.2)
+
+S->S: 2. Техническая валидация запроса
+Note over S: Проверка формата order_id
+    break#f7f6d9 #ff0d0069 Идентификатор некорректный 
+        S-->C: 2.1 400 Bad Request (см. таблицу 3.2)
     end
-    S->S: Аутентификация
-    break#d49af1 #ff0d0069 Токен невалидный \ отсутствует \ истек
-    S-->C: 401 Unauthorized
+Note over S #66e30087: 2.2. Идентификатор корректный
+
+S->S: 3. Аутентификация
+Note over S: Проверка заголовка Authorization
+    break#f7f6d9 #ff0d0069 Токен невалидный \ отсутствует \ истек
+        S-->C: 3.1. 401 Unauthorized (см. таблицу 3.3)
     end
-    S->DB ++: Отправка сформированного запроса
-    alt#d49af1 #ff0d0069 пользователь не владеет заказом или заказ отсутствует
-    DB-->S: пустой результат (NULL)
-    S-->C: 404 Not Found
+Note over S #66e30087: 3.2. Токен валидный
+
+S->S: 4. Извлечение пользовательского контекста
+Note over S: Получение user_id из токена
+
+S->DB ++: 5. SELECT заказа по order_id и user_id
+    alt#f7f6d9 #ff0d0069 пользователь не владеет заказом или заказ отсутствует
+        DB-->S: 6.1. пустой результат (NULL)
+            S-->C: 7.1. 404 Not Found (см. таблицу 3.4)
+
     else Ошибка подключения
-    DB-->S:  Ошибка подключения
-    S-->C: 500 Internal Server Error
+        DB-->S:  6.2. ConnectionError or Timeout
+            S-->C: 7.2. 500 Internal Server Error (см. таблицу 3.5)
+
     else #66e30087 заказ найден
-    DB-->S --: сырые данные (Result Set)
-     S->S: Мапинг
-    Note over S: Result Set -> JSON
-    
-    S-->C --: 200 OK, JSON объект в теле ответа (см. таблицу 3)
+        DB-->S --: 6.3. сырые данные (Result Set)
+            S->S: 7.3. Мапинг данных
+                Note over S: Result Set -> JSON
+                    S-->C --: 8. 200 OK, JSON объект в теле ответа (см. таблицу 2.3)
     end
 @enduml
 ```
 
-### 1. Таблица входных параметров (Input)
+### 2. Контракт метода
+
+#### 2.1. Таблица входных параметров (Input)
+
 | Имя параметра | Тип данных | Обязательность | Описание |
 | :--- | :--- | :--- | :--- |
-| *order_id* | *String* | *Да* | *Идентификатор заказа* |
+| `order_id` | String (формат UUID) | Да | Идентификатор заказа. Передается в пути запроса: `/orders/{order_id}` |
 
-### 2. Таблица заголовков
+#### 2.2. Таблица заголовков
+
 | Имя параметра | Тип данных | Обязательность | Описание |
 | :--- | :--- | :--- | :--- |
-| *Authorization* | *String(Bearer Tocken)* | *Да* | *Токен доступа* |
-| *Accept* | *String* | *Нет* | *Желаемый формат ответа* |
-| *X-Request-ID* | *String* | *Нет* | *Идентификатор запроса* |
+| `Authorization` | String(Bearer Token) | Да | Токен доступа пользователя |
+| `Accept` | String | Нет | Желаемый формат ответа: `application/json` |
+| `X-Request-ID` | String | Нет | Идентификатор запроса для трассировки |
 
-### 3. Таблица выходных параметров (Output)
+#### 2.3. Таблица выходных параметров (Output)
+
 | Имя параметра | Тип данных | Описание |
 | :--- | :--- | :--- |
-| *order* | *Object* | *Основная информация о заказе* |
-| *order.id* | *String* | *Идентификатор заказа* |
-| *order.status* | *String* | *Статус заказа* |
-| *order.total* | *Number* | *Итоговая стоимость заказа* |
-| *order.items* | *Array[Object]* | *Массив товаров в заказе* |
-| *items[].id* | *String* | *Идентификатор товара* |
-| *items[].name* | *String* | *Наименование товара* |
-| *items[].quantity* | *String* | *Количество товара* |
-| *items[].price* | *Number* | *Цена за единицу товара* |
-| *delivery* | *Object* | *Данные о резервировании* |
-| *delivery.slot_reservation_id* | *String* | *Идентификатор полученный на этапе резервирования слота доставки* |
-| *delivery.tracking_number* | *String* | *Трекер-номер для отслеживания заказа* |
+| `order` | Object | Основная информация о заказе |
+| `order.id` | String ( формат UUID) | Идентификатор заказа |
+| `order.status` | String | Статус заказа: `reserved`, `pending_reservation`, `reservation_failed` |
+| `order.total` | String (формат Decimal) | Итоговая стоимость заказа |
+| `order.items` | Array[Object] | Массив товаров в заказе |
+| `order.items[].id` | String | Идентификатор товара |
+| `order.items[].name` | String | Наименование товара |
+| `order.items[].quantity` | Number (формат Integer) | Количество товара |
+| `order.items[].price` | String (формат Decimal) | Цена за единицу товара |
+| `delivery` | Object | Данные о резервировании. Может отсутствовать, если доставка еще не зарезервирована |
+| `delivery.address` | String | Адрес доставки, указанный клиентом |
+| `delivery.date` | String | Желаемая дата доставки в формате `YYYY-MM-DD` |
+| `delivery.slot_reservation_id` | String | Идентификатор полученный на этапе резервирования слота доставки |
+| `delivery.tracking_number` | String | Трекер-номер для отслеживания заказа |
+
+
+### 3. Ошибки
+
+Все ошибки возвращаются в едином формате:
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Человекочитаемое описание ошибки"
+}
+```
+
+#### 3.1. Таблица выходных параметров ошибки
+
+| Имя параметра | Тип данных | Описание |
+|:--|:--|:--|
+| `error` | String | Машинно-читаемый код ошибки |
+| `message` | String | Человекочитаемое описание ошибки |
+
+#### 3.2. Таблица ошибок валидации, `400 Bad Request`
+Возникают на этапе первичной проверки формата запроса.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `order_id` | Параметр отсутствует | `MISSING_ORDER_ID` | Параметр `order_id` обязателен |
+| `order_id` | Параметр является пустой строкой | `EMPTY_ORDER_ID` | Параметр `order_id` не может быть пустым |
+| `order_id` | Параметр имеет неверный формат | `INVALID_ORDER_ID_FORMAT` | Параметр `order_id` должен быть корректным идентификатором заказа |
+
+#### 3.3. Таблица ошибок авторизации, `401 Unauthorized`
+Возникают при проблемах с подтверждением личности пользователя (токеном).
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `Authorization` | Заголовок отсутствует | `MISSING_AUTH_HEADER` | Заголовок `Authorization` обязателен |
+| `Authorization` | Заголовок имеет неверный формат | `INVALID_AUTH_HEADER` | Заголовок `Authorization` должен быть в формате `Bearer <токен>` |
+| `Bearer Token` | Токен имеет невалидный формат, поврежден или не проходит проверку подписи | `INVALID_AUTH_TOKEN` | Токен авторизации недействителен |
+| `Bearer Token` | Срок жизни токена истек | `EXPIRED_AUTH_TOKEN` | Срок действия токена авторизации истек |
+
+#### 3.4. Таблица ошибок доступа и поиска заказа, `404 Not Found`
+Возникает когда запрашиваемый ресурс не существует или скрыт из соображений безопасности.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `order_id` | Заказ не найден | `ORDER_NOT_FOUND` | Заказ с таким идентификатором не найден |
+| `order_id` | Заказ существует, но принадлежит другому пользователю (возврат `404` вместо `403`, чтобы не раскрывать факт существования чужого заказа) | `ORDER_NOT_FOUND` | Заказ с таким идентификатором не найден или недоступен |
+
+#### 3.5. Таблица внутренних ошибок сервера, `500 Internal Server Error`
+Возникают при критических сбоях на стороне сервера или его зависимостей.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `Database` | Ошибка подключения к базе данных | `DB_CONNECTION_ERROR` | Внутренняя ошибка сервиса |
+| `Database` | Таймаут запроса к базе данных | `DB_TIMEOUT` | Внутренняя ошибка сервиса |
+| `Server` | Непредвиденная ошибка обработки запроса | `INTERNAL_SERVER_ERROR` | Внутренняя ошибка сервиса |
+
 
 
 
 
 ## **POST запрос**
+Метод используется для создания заказа. После валидации и сохранения заказа в базе данных система пытается зарезервировать слот доставки во внешнем API.
+
+Если резервирование успешно, заказ считается созданным, и клиент получает `201 Created`.
+
+Если служба доставки вернула окончательный отказ, клиент получает ошибку.
+
+Если временная ошибка не устранена после нескольких попыток, клиент получает `503 Service Unavailable`.
+
 Участники процесса: клиент, сервер, база данных, API службы доставки.
 
-## Диаграмма последовательности для POST меотда
+### 1. Диаграмма последовательности для POST метода
+#### 1.1. Mermaid
 
-### Mermaid диаграмма
 ```mermaid
 sequenceDiagram
     actor C as Клиент
@@ -199,31 +300,53 @@ sequenceDiagram
     participant API as API службы доставки
 
     Note over S: 1. Получение POST запроса от Клиента
-    C->>+S: POST /orders (данные заказа) (см. таблицы 1 и 2)
+    C->>+S: POST /orders (см. таблицы 2.1. и 2.2.)
 
-    Note over S: 2. Подтверждение личности пользоователя
+    Note over S: 2. Проверка метода, маршрута, Content-Type, Idempotency-Key и базового формата тела
+    S->>S: Техническая валидация запроса
+        break Запрос некорректный
+            rect rgba(250, 102, 102, 0.55)
+                S-->>C: 400 Bad Request (см. таблицу 3.2.)
+            end
+        end
+
+    Note over S: 3. Подтверждение личности пользователя
     S->>S: Аутентификация
         break Токен невалидный \ отсутствует \ истек
             rect rgba(250, 102, 102, 0.55)
-                S-->>C: 401 Unauthorized (см. таблицу 3)
+                S-->>C: 401 Unauthorized (см. таблицу 3.3.)
             end
         end
 
-    Note over S: 3. Валидация входных данных
-    S->>S: Валидация 
+    Note over S: 4. Поиск сохраненного ответа по Idempotency-Key
+    S->>+DB: SELECT ответа по Idempotency-Key
+        alt ответ уже существует
+            rect rgba(117, 252, 96, 0.54)
+                DB-->>S: Сохраненный ответ
+                S-->>C: Возврат сохраненного ответа
+            end
+        else ответ не найден
+            rect rgba(250, 102, 102, 0.55)
+                DB-->>-S: NULL
+            end
+        end
+
+
+    Note over S: 5. Проверка товаров, адреса, даты и бизнес-правил
+    S->>S: Бизнес-валидация тела запроса
         break Входные данные не валидны
             rect rgba(250, 102, 102, 0.55)
-                S-->>C: 400 Bad Request (см. таблицу 4)
+                S-->>C: 422 Unprocessable Entity (см. таблицу 3.4.)
             end
         end
 
-    Note over S: 4. Сохранение заказа в Базе данных и получение order_id
-    S->>+DB: Создание нового заказа
+    Note over S: 6. Сохранение заказа в Базе данных и получение order_id
+    S->>+DB: INSERT заказа со статусом pending_reservation
 
     break Ошибка подключения
         rect rgba(250, 102, 102, 0.55)
             DB-->>S: Сервер временно недоступен
-            S-->>C: 500 Bed Request
+            S-->>C: 500 Internal Server Error (см. таблицу 3.5.)
         end
     end
 
@@ -231,85 +354,86 @@ sequenceDiagram
         DB-->>-S: order_id
     end
 
-    Note over S: 5. Резервирование слота доставки
-    S->>S: count = 0, deadline = now + 5s
+    Note over S: 7. Резервирование слота доставки
+    S->>S: 7.1. count = 0, deadline = now + 5s
     loop Максимум 3 попытки, пока время < deadline
-        S->>S: count++
-        S->>+API: POST /reserve (order_id, ...)
+        S->>S: 7.2. count++
+        S->>+API: 8. POST /reserve (см. таблицу 4.1)
         alt Клиентская ошибка (4xx)
         break 
             rect rgba(250, 102, 102, 0.55)
-                API-->>S: 4xx
-                S->>+DB: Обновляем статус заказа на failed
-                DB-->>-S: order_id
-            end
-            rect rgba(117, 252, 96, 0.54)
-                S -->>C: 201 Created {order, delivery} где order.status = failed
+                API-->>S: 9.1. 4xx
+                S->>+DB: 10.1. UPDATE статуса на reservation_failed
+                DB-->>-S: 11.1. updated
+                S -->>C: 12.1. 422 Unprocessable Entity (см. таблицу 3.4.)
             end
             Note right of C: Выход из цикла (отказ, повтор бесполезен)
         end
-        else Временная ошибка (5xx)
-            API-->>S: 503 Service Unavailable (внешний сервис временно перегружен)
-        
+        else Временная ошибка (5xx или таймаут)
+            API-->>S: 9.2. 5xx или таймаут
+
+            Note over S: count < 3
+
+            Note over S: 10.2.1. Рассчет экспоненциальной задержки
             S->>S: delay = (2^сount)*0.5с + random(0,0.3)
+
+            Note over S: 11.2.1. Ожидание перед повтором
             S->>S: sleep(delay)
 
+            Note right of C: Повтор при условии что count < 3 или deadline > now
         else Успех (2xx)
             rect rgba(117, 252, 96, 0.54)
-                API-->>-S: 200 OK (slot_reservation_id, tracking_number)
-                S->>+DB: Обновляем статус заказа на reserved
-                DB-->>-S: order_id
+                API-->>-S: 9.3. slot_reservation_id и tracking_number (см. таблицу 4.2)
+                S->>+DB:  10.3. UPDATE статуса на reserved и сохранение данных доставки
+                DB-->>-S: 11.3. updated
             end
             rect rgba(117, 252, 96, 0.54)
-                S -->>C: 201 Created {order, delivery} где order.status = reserved
+                S -->>C: 12.3. 201 Created
             end
             Note right of C: Выход из цикла (успех)
         end
     end
 
-    Note over S:6. count = 3 или время вышло
+    Note over S: count = 3 или deadline < now
         rect rgba(250, 102, 102, 0.55)
-            S->>+DB: Обновляем статус заказа на failed
-            DB-->>-S: order_id
-        end
-        rect rgba(117, 252, 96, 0.54)
-        S -->>-C: 201 Created {order, delivery} где order.status = failed (см. таблицу 5)
-    end    
+            S->>+DB: 10.2.2. UPDATE статуса на reservation_failed
+            DB-->>-S: 11.2.2. updated
+            S -->>-C: 12.2. 503 Service Unavailable (см. таблицу 3.6.)
+        end    
 ```
-### PlantUML диаграмма
+
+#### 1.2. PlantUML
+
+![plantUML диаграмма](plantUML-diagrams/diagram-2.svg)
+
 ```plantuml
 @startuml
-autonumber "<b><color: purple>00.</color></b>"
-
 skinparam sequence {
-backgroundColor #9800e4
-ArrowColor #34054b
-LifeLineBorderColor #cb84ef
-LifeLineBackgroundColor #d49af1
-NoteBackgroundColor #360251
+backgroundColor #ffffff
+ArrowColor #000000
+LifeLineBorderColor #000000
+LifeLineBackgroundColor #ffffff
 
-ParticipantBorderColor #6a228e
-ParticipantBackgroundColor #daaff0
+ParticipantBorderColor #000000
+ParticipantBackgroundColor #f7f6d9
 ParticipantFontName Aapex
 ParticipantFontSize 20
-ParticipantFontColor #34054b
+ParticipantFontColor #000000
 
-ActorBorderColor #6a228e
-ActorBackgroundColor #daaff0
+ActorBorderColor #000000
+ActorBackgroundColor #f7f6d9
 ActorFontName Aapex
 ActorFontSize 20
-ActorFontColor #34054b
+ActorFontColor #000000
 ActorStyle awesome
 }
 skinparam database {
-BorderColor #6a228e
-BackgroundColor #daaff0
+BorderColor #000000
+BackgroundColor #f7f6d9
 FontName Aapex
 FontSize 20
-FontColor #34054b
+FontColor #000000
 }
-
-skinparam NoteBackgroundColor #daaff07d
 
 actor C as "Клиент"
 participant S as "Сервер"
@@ -317,113 +441,230 @@ database DB as "База данных"
 participant API as "API службы доставки"
 
 Note over S: 1. Получение POST запроса от Клиента
-    C->S ++: POST /orders (данные заказа) (см. таблицы 1 и 2)
+    C->S ++: POST /orders (см. таблицы 2.1. и 2.2.)
 
-    Note over S: 2. Подтверждение личности пользоователя
-    S->S: Аутентификация
-        break#d49af1 #ff0d0069 Токен невалидный \ отсутствует \ истек
-            S-->C: 401 Unauthorized (см. таблицу 3)
-        end
-
-    Note over S: 3. Валидация входных данных
-    S->S: Валидация 
-        break#d49af1 #ff0d0069 Входные данные не валидны
-            S-->C: 400 Bad Request (см. таблицу 4)
-        end
-
-    Note over S: 4. Сохранение заказа в Базе данных и получение order_id
-    S->DB ++: Создание нового заказа
-
-    break#d49af1 #ff0d0069 Ошибка подключения
-        DB-->S: Сервер временно недоступен
-        S-->C: 500 Bed Request
+Note over S: 2. Проверка метода, маршрута, Content-Type, Idempotency-Key и базового формата тела
+    S->S: Техническая валидация запроса
+    break#f7f6d9 #ff0d0069 Запрос некорректный
+        S-->C: 400 Bad Request (см. таблицу 3.2.)
     end
 
-        DB-->S --: order_id
+Note over S: 3. Подтверждение личности пользователя
+    S->S: Аутентификация
+        break#f7f6d9 #ff0d0069 Токен невалидный \ отсутствует \ истек
+            S-->C: 401 Unauthorized (см. таблицу 3.3.)
+        end
 
-    Note over S: 5. Резервирование слота доставки
-    S->S: count = 0, deadline = now + 5s
-    loop#9BED00 Максимум 3 попытки, пока время < deadline
-        S->S: count++
-        S->API ++: POST /reserve (order_id, ...)
-        alt#FFD400 Клиентская ошибка (4xx)
-            API-[#ff0d00]->S: 4xx
-            S->DB ++: Обновляем статус заказа на failed
-            DB-->S --: order_id
+Note over S: 4. Поиск сохраненного ответа по Idempotency-Key
+    S->DB ++: SELECT ответа по Idempotency-Key
+    alt#f7f6d9 #66e30087 ответ уже существует
+        DB-->S: Сохраненный ответ
+        S-->C: Возврат сохраненного ответа
+    else #ff0d0069 ответ не найден
+        DB-->S --: NULL
+    end
 
-            S-[#66e300]->C: 201 Created {order, delivery} где order.status = failed
-            Note right of C: Выход из цикла (отказ, повтор бесполезен)
-        else Временная ошибка (5xx)
-            API-[#ff0d00]->S: 503 Service Unavailable (внешний сервис временно перегружен)
-        
+Note over S: 5. Проверка товаров, адреса, даты и бизнес-правил
+    S->S: Бизнес-валидация тела запроса
+        break#f7f6d9 #ff0d0069 Входные данные не валидны
+            S-->>C: 422 Unprocessable Entity (см. таблицу 3.4.)
+        end
+
+Note over S: 6. Сохранение заказа в Базе данных и получение order_id
+    S->DB ++: INSERT заказа со статусом pending_reservation
+
+    break#f7f6d9 #ff0d0069 Ошибка подключения
+        DB-->S: Сервер временно недоступен
+        S-->C: 500 Internal Server Error (см. таблицу 3.5.)
+    end
+
+    DB-[#66e30087]->S --: order_id
+
+Note over S: 7. Резервирование слота доставки
+    S->S: 7.1. count = 0, deadline = now + 5s
+    loop#f7f6d9 Максимум 3 попытки, пока время < deadline
+        S->S: 7.2. count++
+        S->API ++: 8. POST /reserve (см. таблицу 4.1)
+        alt#f7f6d9 Клиентская ошибка (4xx)
+            API-[#ff0d00]->S: 9.1. 4xx
+            S->DB ++: 10.1. UPDATE статуса на reservation_failed
+            DB-->S --: 11.1. updated
+            S-[#ff0d00]->C: 12.1. 422 Unprocessable Entity (см. таблицу 3.4.)
+        Note right of C: Выход из цикла (отказ, повтор бесполезен)
+        else Временная ошибка (5xx или таймаут)
+            API-[#ff0d00]->S: 9.2. 5xx или таймаут
+
+            Note over S: count < 3
+
+            Note over S: 10.2.1. Рассчет экспоненциальной задержки
             S->S: delay = (2^сount)*0.5с + random(0,0.3)
+
+            Note over S: 11.2.1. Ожидание перед повтором
             S->S: sleep(delay)
 
+        Note right of C: Повтор при условии что count < 3 или deadline > now
         else #66e30087 Успех (2xx)
-                API-->S --: 200 OK (slot_reservation_id, tracking_number)
-                S->DB ++: Обновляем статус заказа на reserved
-                DB-->S --: order_id
+            API-->S --: 9.3. slot_reservation_id и tracking_number (см. таблицу 4.2)
+            S->DB ++:  10.3. UPDATE статуса на reserved и сохранение данных доставки
+            DB-->S --: 11.3. updated
 
-                S -->C: 201 Created {order, delivery} где order.status = reserved
-
-            Note right of C: Выход из цикла (успех)
+            S-->C: 12.3. 201 Created
+        Note right of C: Выход из цикла (успех)
         end
     end
 
-    Note over S:6. count = 3 или время вышло
-        S->DB ++: Обновляем статус заказа на failed
-        DB-->S --: order_id
+Note over S: count = 3 или deadline < now
 
-        S-[#66e300]->C --: 201 Created {order, delivery} где order.status = failed (см. таблицу 5)
+    S->DB ++: 10.2.2. UPDATE статуса на reservation_failed
+    DB-->S --: 11.2.2. updated
+    S -[#ff0d00]->C --: 12.2. 503 Service Unavailable (см. таблицу 3.6.)
 @enduml
 ```
 
-### 1. Таблица входных параметров (Input)
+### 2. Контракт метода
+
+#### 2.1. Таблица входных параметров (Input)
 | Имя параметра | Тип данных | Обязательность | Описание |
 | :--- | :--- | :--- | :--- |
-| *comment* | *String* | *Нет* | *Комментарий к заказу* |
-| *items* | *Array[Object]* | *Да* | *Массив товаров в заказе* |
-| *items[].id* | *String* | *Да* | *Идентификатор товара* |
-| *items[].quantity* | *String* | *Да* | *Количество товара* |
+| `comment` | String | Нет | Комментарий к заказу |
+| `items` | Array[Object] | Да | Массив товаров в заказе |
+| `items[].id` | String | Да | Идентификатор товара |
+| `items[].quantity` | String | Да | Количество товара |
+| `delivery` | Object | Да | Данные о резервировании |
+| `delivery.address` | String | Да | Адрес доставки, указанный клиентом |
+| `delivery.date` | String | Да | Желаемая дата доставки в формате `YYYY-MM-DD` |
 
 
-### 2. Таблица заголовков
+#### 2.2. Таблица заголовков
 | Имя заголовка | Тип данных | Обязательность | Описание |
 | :--- | :--- | :--- | :--- |
-| *Authorization* | *String(Bearer Token)* | *Да* | *Токен доступа* |
-| *Accept* | *String* | *Нет* | *Желаемый формат ответа* |
-| *X-Request-ID* | *String* | *Нет* | *Идентификатор запроса* |
+| `Authorization` | String(Bearer Token) | Да | Токен доступа |
+| `Idempotency-Key` | String (формат UUID) | Да | Ключ идемпотентности для защиты от повторного создания заказа |
+| `Accept` | String | Нет | Желаемый формат ответа |
+| `X-Request-ID` | String | Нет | Идентификатор запроса |
 
 
-### 3. Таблица ошибок авторизации (HTTP 401 Unauthorized)
-| Заголовок | Условие ошибки | Error | Message
-| :--- | :--- | :--- | :--- |
-| *Authorization* | *Отсутствует или не в формате Bearer<токен>* | *MISSING_AUTH_HEADER* | *Обязателен и должен быть в формате Bearer<токен>* |
-| *Authorizations* | *Токен истек* | *EXPIRED_AUTH_HEADER* | *Срок действия токена авторизации истек* |
 
+#### 2.3. Таблица выходных параметров (Output)
 
-### 4. Таблица ошибок валидации (HTTP 400 Bad Request)
-| Имя параметра | Условие ошибки | Error | Message
-| :--- | :--- | :--- | :--- |
-| *items* | *Отсутствует или не является массивом* | *MISSING_ITEMS* | *Массив items обязателен* |
-| *items* | *Массив пустой* | *EMPTY_ITEMS* | *Массив items должен содержать хотя бы 1 товар* |
-| *items[].id* | *Отсутствует, путсая строка* | *MISSING_ITEM_ID* | *item[].id  обязателен и должен быть не пустой строкой* |
-| *items[].id* | *Длина > 50* | *INVALID_ITEM_ID* | *item[].id  должен быть строкой не более 50 символов* |
-| *items[].quantity* | *Отсутствует* | *MISSING_ITEM_QUANTITY* | *item[].quantity обязателен* |
-| *items[].quantity* | *Не число, не целое, значение < 1* | *INVALID_ITEM_QUANTITY* | *item[].quantity должен быть целым числом (не менее 1)* |
-
-### 5. Таблица выходных параметров (Output)
 | Имя параметра | Тип данных | Описание |
 | :--- | :--- | :--- |
-| *order* | *Object* | *Основная информация о заказе* |
-| *order.id* | *String* | *Идентификатор заказа* |
-| *order.status* | *String* | *Статус заказа* |
-| *order.total* | *Number* | *Итоговая стоимость заказа* |
-| *order.items* | *Array[Object]* | *Массив товаров в заказе* |
-| *items[].id* | *String* | *Идентификатор товара* |
-| *items[].name* | *String* | *Наименование товара* |
-| *items[].quantity* | *String* | *Количество товара* |
-| *items[].price* | *Number* | *Цена за единицу товара* |
-| *delivery* | *Object* | *Данные о резервировании* |
-| *delivery.slot_reservation_id* | *String* | *Идентификатор полученный на этапе резервирования слота доставки* |
-| *delivery.tracking_number* | *String* | *Трекер-номер для отслеживания заказа* |
+| `order` | Object | Основная информация о заказе |
+| `order.id` | String (формат UUID) | Идентификатор заказа |
+| `order.status` | String | Статус заказа: `reserved`, `pending_reservation`, `reservation_failed` |
+| `order.total` | String (формат Decimal) | Итоговая стоимость заказа |
+| `order.items` | Array[Object] | Массив товаров в заказе |
+| `order.items[].id` | String | Идентификатор товара |
+| `order.items[].name` | String | Наименование товара |
+| `order.items[].quantity` | Number (формат Integer) | Количество товара |
+| `order.items[].price` | String (формат Decimal) | Цена за единицу товара |
+| `delivery` | Object | Данные о резервировании |
+| `delivery.address` | String | Адрес доставки, указанный клиентом |
+| `delivery.date` | String | Желаемая дата доставки в формате `YYYY-MM-DD` |
+| `delivery.slot_reservation_id` | String | Идентификатор полученный на этапе резервирования слота доставки |
+| `delivery.tracking_number` | String | Трекер-номер для отслеживания заказа |
+
+
+
+### 3. Контракт ошибок
+
+Все ошибки возвращаются в едином формате:
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Человекочитаемое описание ошибки"
+}
+```
+
+#### 3.1. Таблица выходных параметров ошибки
+| Имя параметра | Тип данных | Описание |
+|:--|:--|:--|
+| `error` | String | Машинно-читаемый код ошибки |
+| `message` | String | Человекочитаемое описание ошибки |
+
+#### Таблица 3.2. Таблица ошибок технической валидации, `400 Bad Request`
+Возникают на этапе первичной проверки формата запроса до обращения к бизнес-логике.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `HTTP Method` | Метод запроса не `POST` | `INVALID_METHOD` | Для создания заказа поддерживается только метод POST |
+| `URL Path` | Маршрут не соответствует `/orders` | `INVALID_ROUTE` | Указанный маршрут не найден |
+| `Content-Type` | Отсутствует или не является `application/json` | `INVALID_CONTENT_TYPE` | Тело запроса должно быть в формате `application/json` |
+| `Idempotency-Key` | Отсутствует или имеет неверный формат | `INVALID_IDEMPOTENCY_KEY` | Заголовок `Idempotency-Key` обязателен и должен быть корректным |
+| `Request body` | Тело отсутствует или содержит некорректный JSON | `MALFORMED_JSON` | Тело запроса должно быть корректным JSON-объектом |
+
+---
+
+#### Таблица 3.3. Таблица ошибок авторизации, `401 Unauthorized`
+Возникают при проблемах с подтверждением личности пользователя (токеном).
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `Authorization` | Заголовок отсутствует | `MISSING_AUTH_HEADER` | Заголовок `Authorization` обязателен |
+| `Authorization` | Заголовок имеет неверный формат | `INVALID_AUTH_HEADER` | Заголовок `Authorization` должен быть в формате `Bearer <токен>` |
+| `Bearer Token` | Токен имеет невалидный формат, поврежден или не проходит проверку подписи | `INVALID_AUTH_TOKEN` | Токен авторизации недействителен |
+| `Bearer Token` | Срок жизни токена истек | `EXPIRED_AUTH_TOKEN` | Срок действия токена авторизации истек |
+
+---
+
+#### Таблица 3.4. Таблица ошибок бизнес-валидации, `422 Unprocessable Entity`
+Возникают, когда синтаксис запроса верен, но бизнес-правила нарушены, либо когда внешнее API доставки возвращает клиентскую ошибку (4xx).
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `items` | Массив товаров пуст, отсутствует или не является массивом | `EMPTY_ITEMS` | Заказ должен содержать хотя бы один товар |
+| `items[].id` | Товар не найден или недоступен для заказа | `ITEM_NOT_FOUND` | Товар не найден или недоступен для заказа |
+| `items[].quantity` | Количество меньше 1 или превышает доступный остаток на складе | `ITEM_OUT_OF_STOCK` | Некорректное количество или недостаточно товара на складе |
+| `delivery` | Объект доставки пуст, отсутствует или не является объектом | `DELIVERY_NOT_FOUND` | Данные о резервировании должны быть заполнены |
+| `delivery.address` | Адрес невалиден, не заполнены обязательные поля или находится вне зоны доставки | `DELIVERY_ADDRESS_UNAVAILABLE` | Адрес доставки некорректен или находится вне зоны обслуживания |
+| `delivery.date` | Дата доставки недоступна или уже прошла | `DELIVERY_DATE_UNAVAILABLE` | Дата доставки должна быть в будущем и в пределах доступного расписания |
+
+---
+
+#### Таблица 3.5. Таблица ошибок подключения к базе данных, `500 Internal Server Error`
+Возникают при критических сбоях на стороне сервера или его зависимостей.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `Database` | Ошибка подключения к базе данных | `DB_CONNECTION_ERROR` | Внутренняя ошибка сервиса |
+| `Database` | Таймаут запроса к базе данных | `DB_TIMEOUT` | Внутренняя ошибка сервиса |
+| `Server` | Непредвиденная ошибка обработки запроса | `INTERNAL_SERVER_ERROR` | Внутренняя ошибка сервиса |
+
+---
+
+#### Таблица 3.6. Таблица ошибок превышение лимитов резервирования `503 Service Unavailable`
+Возникают, когда не удалось успешно зарезервировать слот доставки после исчерпания попыток или времени.
+
+| Имя параметра | Условие ошибки | Error | Message |
+| :--- | :--- | :--- | :--- |
+| `Delivery API` | Превышено максимальное количество попыток (count = 3) из-за постоянных 5xx/таймаутов от API доставки | `DELIVERY_RESERVATION_RETRIES_EXCEEDED` | Превышено число попыток связи со службой доставки |
+| `Delivery API` | Истек дедлайн ожидания (deadline < now, более 5 секунд) из-за долгих ответов API доставки | `DELIVERY_RESERVATION_TIMEOUT` | Превышено время ожидания ответа от службы доставки |
+
+
+### 4. Таблица маппинга для внешнего API службы доставки
+
+#### 4.1. Маппинг запроса к внешнему API
+
+| Поле нашей системы | Поле внешнего API | Логика преобразования |
+| :--- | :--- | :--- |
+| `order.id` | `merchant_order_id` | Прямой маппинг. Идентификатор заказа, сгенерированный нашей системой, передается как строка без изменений. |
+| `user_id` | `customer.id` | Прямой маппинг. Идентификатор пользователя извлекается из токена аутентификации и передается как строка. |
+| `delivery.address` | `destination.address` | Прямой маппинг с нормализацией. Строка адреса передается как есть, но перед отправкой выполняется: удаление лишних пробелов, приведение к единому формату (например, "ул." вместо "улица"). |
+| `delivery.date` | `slot.date` | Прямой маппинг. Дата в формате YYYY-MM-DD передается без изменений. |
+| `items[].id` | `items[].sku` | Прямой маппинг с переименованием. Идентификатор товара из нашей системы передается как артикул (sku) во внешней системе. Значение не меняется. |
+| `items[].quantity` | `items[].quantity` | Прямой маппинг. Целое число передается без изменений. |
+| `items[].name` | `items[].description` | Обогащение. Если клиент не указал наименование товара, оно извлекается из каталога товаров по items[].id и передается как описание. Если наименование уже есть, передается как есть. |
+| `order.total` | `declared_value` | Вычисление. Сумма рассчитывается сервером как SUM(items[].price * items[].quantity). Результат округляется до 2 знаков после запятой и передается как строка в формате десятичного числа. |
+| `comment` | `comment` | Условный маппинг. Если комментарий указан и не пустой, он передается как строка. Если комментарий отсутствует или пустой, поле не включается в запрос. |
+| `Idempotency-Key` | `X-Idempotency-Key` | Трансформация. Заголовок идемпотентности формируется как {Idempotency-Key}:{order_id}, где Idempotency-Key — ключ из запроса клиента, а order_id — идентификатор заказа. Это гарантирует уникальность вызова даже при повторной обработке одного и того же клиентского ключа. |
+
+#### 4.2. Маппинг ответа внешней службы доставки
+
+| Поле нашей системы | Поле внешнего API | Логика преобразования |
+| :--- | :--- | :--- |
+| `delivery.slot_reservation_id` | `slot_reservation_id` | Прямой маппинг. Передается как строка без изменений. Сохраняется в БД и возвращается клиенту. |
+| `delivery.tracking_number` | `tracking_number` | Прямой маппинг. Передается как строка без изменений. Сохраняется в БД и возвращается клиенту. |
+
+---
+
